@@ -71,10 +71,17 @@ run.write.configs <- function(settings, ensemble.size, input_design, write = TRU
                               posterior.files = rep(NA, length(settings$pfts)),
                               overwrite = TRUE, samples = NULL) {
 
+  # A design describes itself: one carrying the SA labels (sa_pft, sa_trait,
+  # sa_quantile) is a sensitivity-analysis design; anything else is an ensemble.
+  # Dispatch on the design, not on which settings sections are present, so a
+  # single design produces a single kind of run.
+  is_sa <- !is.null(input_design) &&
+    all(c("sa_pft", "sa_trait", "sa_quantile") %in% names(input_design))
+
   # Validate that input_design matches ensemble.size for ensemble runs
   # Note: for SA, ensemble.size is not meaningful; SA design size is determined by
   # number of (pft, trait, quantile) combinations
-  if (!is.null(input_design) && "ensemble" %in% names(settings)) {
+  if (!is.null(input_design) && !is_sa) {
     if (nrow(input_design) != ensemble.size) {
       stop(
         "input_design has ", nrow(input_design), " rows, but ensemble.size is ",
@@ -183,7 +190,7 @@ run.write.configs <- function(settings, ensemble.size, input_design, write = TRU
 
   # build ensemble.samples only for ensemble runs
   # SA runs use sa.samples directly (quantile-based), not ensemble.samples
-  if ("ensemble" %in% names(settings) &&
+  if (!is_sa &&
       !is.null(input_design) &&
       "param" %in% colnames(input_design)) {
     trait_sample_indices <- input_design[["param"]]
@@ -241,7 +248,7 @@ run.write.configs <- function(settings, ensemble.size, input_design, write = TRU
   ### NEED TO IMPLEMENT: Load Environmental Priors and Posteriors
 
   ### Sensitivity Analysis
-  if ("sensitivity.analysis" %in% names(settings)) {
+  if (is_sa) {
     ### Write out SA config files
     PEcAn.logger::logger.info("\n ----- Writing model config files for sensitivity run ----")
 
@@ -306,7 +313,7 @@ run.write.configs <- function(settings, ensemble.size, input_design, write = TRU
   } ### End of SA
 
   ### Write ENSEMBLE
-  if ("ensemble" %in% names(settings)) {
+  if (!is_sa) {
     ens.runs <- PEcAn.uncertainty::write.ensemble.configs(
       defaults = settings$pfts,
       ensemble.size = ensemble.size,
